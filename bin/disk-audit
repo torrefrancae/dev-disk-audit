@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SELF="${BASH_SOURCE[0]}"
+while [[ -L "$SELF" ]]; do
+  _dir="$(cd "$(dirname "$SELF")" && pwd)"
+  SELF="$(readlink "$SELF")"
+  [[ "$SELF" != /* ]] && SELF="$_dir/$SELF"
+done
+ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
+DIST="$ROOT/dist/cli.js"
+
+if [[ ! -f "$DIST" ]]; then
+  echo "Build missing. From $ROOT run: npm install" >&2
+  exit 1
+fi
+
+exec node "$DIST" "$@"
