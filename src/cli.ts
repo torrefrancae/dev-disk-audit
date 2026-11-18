@@ -6,7 +6,7 @@ import { scanGitCheckouts } from "@src/scan.js";
 const HELP = `disk-audit - show disk held by quiet git checkouts
 
 Usage:
-  disk-audit repos <path> [--days <n>] [--all] [--json]
+  disk-audit repos <path> [--days <n>] [--all] [--json] [--skip-root-trees] [--skip-dirs <list>]
 
 Commands:
   repos <path>   Measure git checkouts under a directory
@@ -15,6 +15,12 @@ Options:
   --days <n>     Flag checkouts whose newest file write is at least this many days old (default 15)
   --all          Also list checkouts inside the cutoff
   --json         Print JSON on stdout
+  --skip-root-trees
+                 Omit a git checkout that is the path itself or a direct child of it.
+                 Checkouts nested under that tree are still measured.
+  --skip-dirs <list>
+                 Do not walk directories whose name matches a comma-separated list.
+                 * matches any characters in the name.
   -h, --help     Show this help
 `;
 
@@ -32,6 +38,8 @@ export function main(argv: string[]): number {
         days: { type: "string", default: "15" },
         all: { type: "boolean", default: false },
         json: { type: "boolean", default: false },
+        "skip-root-trees": { type: "boolean", default: false },
+        "skip-dirs": { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
     });
@@ -66,10 +74,19 @@ export function main(argv: string[]): number {
   process.stderr.write(`scanning ${target}\n`);
   let result;
   try {
+    const skipDirs = String(parsed.values["skip-dirs"] ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
     result = scanGitCheckouts(target, Date.now(), days, {
+      skipRootTrees: parsed.values["skip-root-trees"] === true,
+      skipDirs,
       onProgress(directories) {
-        if (!process.stderr.isTTY) return;
-        process.stderr.write(`\rscanning ${directories} directories`);
+        if (process.stderr.isTTY) {
+          process.stderr.write(`\rscanning ${directories} directories`);
+          return;
+        }
+        if (directories % 20000 === 0) process.stderr.write(`scanning ${directories} directories\n`);
       },
     });
   } catch (error) {

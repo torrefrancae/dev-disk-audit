@@ -1,7 +1,7 @@
 {
   "name": "dev-disk-audit",
-  "version": "0.1.0",
-  "description": "Find git checkouts that have gone quiet and show how much disk they still hold.",
+  "version": "0.2.0",
+  "description": "Report quiet git checkouts and the disk they still hold, without double-counting nested repos.",
   "type": "module",
   "license": "MIT",
   "author": "Eldridge Torrefranca",
@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --tsconfig tsconfig.json --test test/scan.test.ts",
+    "test": "tsx --tsconfig tsconfig.json --test test/scan.test.ts test/patterns.test.ts",
     "prepare": "npm run build"
   },
   "repository": {

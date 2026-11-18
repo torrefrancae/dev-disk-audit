@@ -75,13 +75,17 @@ export function renderReport(result: ScanResult, showActive: boolean): string {
     `cutoff: ${formatWhen(result.cutoffMs)} (${result.days} days)`,
     `walked: ${result.directories} directories, ${result.errors} read errors`,
     outsideLine(result.outside),
+  ];
+  if (result.skipRootTrees) lines.push(totalLine("skipped root trees", result.skippedRoots));
+  if (result.skippedDirs.length > 0) lines.push(`skipped dirs: ${result.skippedDirs.join(", ")}`);
+  lines.push(
     "",
     `git checkouts: ${result.checkouts.length}`,
     totalLine("untouched", quiet),
     totalLine("active", active),
     "",
     ...table("untouched", quiet, result.root),
-  ];
+  );
   if (showActive) {
     lines.push("", ...table("active", active, result.root));
   }
@@ -117,6 +121,14 @@ export function renderJson(result: ScanResult): string {
       directories: result.directories,
       errors: result.errors,
       outside: result.outside,
+      skipRootTrees: result.skipRootTrees,
+      skippedDirs: result.skippedDirs,
+      skippedRoots: result.skippedRoots.map((checkout) => ({
+        path: checkout.path,
+        relative: relativeCheckout(result.root, checkout.path),
+        allocatedBytes: checkout.allocatedBytes,
+        logicalBytes: checkout.logicalBytes,
+      })),
       totals: {
         checkouts: checkouts.length,
         untouched: pack(quiet),

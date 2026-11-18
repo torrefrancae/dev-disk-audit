@@ -20,5 +20,8 @@ export type ScanResult = {
   directories: number;
   errors: number;
   outside: ByteTotal;
+  skipRootTrees: boolean;
+  skippedDirs: string[];
+  skippedRoots: GitCheckout[];
   checkouts: GitCheckout[];
 };

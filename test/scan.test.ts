@@ -73,6 +73,46 @@ test("charges nested checkouts separately and ignores Finder metadata for age", 
   }
 });
 
+test("skips root checkouts and matching directory names, and still audits nested checkouts", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "disk-audit-"));
+  try {
+    const top = path.join(root, "top");
+    mkdirSync(path.join(top, ".git"), { recursive: true });
+    writeFileSync(path.join(top, "README.md"), "top");
+    const nested = path.join(top, "nested");
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(path.join(nested, ".git"), "gitdir: /tmp/example\n");
+    writeFileSync(path.join(nested, "payload.txt"), "nested");
+
+    const skipped = path.join(root, "bio-demo2");
+    mkdirSync(path.join(skipped, ".git"), { recursive: true });
+    writeFileSync(path.join(skipped, "hidden.txt"), "nope");
+
+    const keep = path.join(root, "keep-child", "repo");
+    mkdirSync(path.join(keep, ".git"), { recursive: true });
+    writeFileSync(path.join(keep, "note.txt"), "keep");
+
+    const result = scanGitCheckouts(root, Date.now(), 15, {
+      skipRootTrees: true,
+      skipDirs: ["bio*2"],
+    });
+    const rels = result.checkouts.map((item) => path.relative(result.root, item.path)).sort();
+    assert.deepEqual(rels, [path.join("keep-child", "repo"), path.join("top", "nested")].sort());
+    assert.deepEqual(
+      result.skippedRoots.map((item) => path.relative(result.root, item.path)),
+      ["top"],
+    );
+    assert.equal(result.skippedDirs.length, 1);
+    assert.match(result.skippedDirs[0] ?? "", /bio-demo2$/);
+    const report = renderReport(result, false);
+    assert.match(report, /skipped root trees: 1,/);
+    assert.match(report, /skipped dirs: .*bio-demo2/);
+    assert.doesNotMatch(report, /\btop\b/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("does not walk a symlinked directory as another checkout", () => {
   const root = mkdtempSync(path.join(tmpdir(), "disk-audit-"));
   try {

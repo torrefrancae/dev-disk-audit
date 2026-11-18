@@ -1,13 +1,20 @@
 import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
 import type { Dirent, Stats } from "node:fs";
 import path from "node:path";
+import { compileNamePatterns } from "@src/patterns.js";
 import type { ByteTotal, GitCheckout, GitKind, ScanResult } from "@src/types.js";
 
 const SKIP_MTIME = new Set([".DS_Store"]);
 
 export type ScanOptions = {
   onProgress?: (directories: number) => void;
+  skipRootTrees?: boolean;
+  skipDirs?: string[];
 };
+
+function isRootTree(root: string, dir: string): boolean {
+  return dir === root || path.dirname(dir) === root;
+}
 
 function emptyTotal(): ByteTotal {
   return { logicalBytes: 0, allocatedBytes: 0, files: 0 };
@@ -54,7 +61,10 @@ export function scanGitCheckouts(
   }
   const root = realpathSync(rootInput);
   const cutoffMs = nowMs - days * 86_400_000;
+  const skipRootTrees = options.skipRootTrees === true;
+  const skipName = compileNamePatterns(options.skipDirs ?? []);
   const checkouts = new Map<string, GitCheckout>();
+  const skippedDirs: string[] = [];
   const outside = emptyTotal();
   let directories = 0;
   let errors = 0;
@@ -100,6 +110,11 @@ export function scanGitCheckouts(
         addBytes(outside, st, file);
       }
       if (st.isDirectory() && !st.isSymbolicLink()) {
+        if (skipName(entry.name)) {
+          const rel = path.relative(root, full);
+          skippedDirs.push(rel === "" ? entry.name : rel);
+          continue;
+        }
         stack.push({ dir: full, owner });
       }
     }
@@ -117,6 +132,12 @@ export function scanGitCheckouts(
   }
 
   options.onProgress?.(directories);
+  const listed: GitCheckout[] = [];
+  const skippedRoots: GitCheckout[] = [];
+  for (const checkout of checkouts.values()) {
+    if (skipRootTrees && isRootTree(root, checkout.path)) skippedRoots.push(checkout);
+    else listed.push(checkout);
+  }
   return {
     root,
     days,
@@ -124,6 +145,9 @@ export function scanGitCheckouts(
     directories,
     errors,
     outside,
-    checkouts: [...checkouts.values()],
+    skipRootTrees,
+    skippedDirs,
+    skippedRoots,
+    checkouts: listed,
   };
 }
